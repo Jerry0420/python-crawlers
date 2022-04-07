@@ -1,0 +1,14 @@
+version: '3.7'
+services: 
+    crawlers:
+        build: .
+        container_name: crawlers
+        stdin_open: true
+        tty: true
+        volumes:
+          - .:/python-crawlers
+        networks:
+          - crawlers
+networks:
+    crawlers:
+        external: true
