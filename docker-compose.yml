@@ -1,8 +1,9 @@
 version: '3.7'
 services: 
     crawlers:
-        build: .
+        image: python:3.10.4-alpine
         container_name: crawlers
+        working_dir: /python-crawlers
         stdin_open: true
         tty: true
         volumes:
