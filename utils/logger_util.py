@@ -61,3 +61,31 @@ def init_log(path=os.getcwd(), site_name=''):
     logger.addHandler(console_handler)
     logger.addHandler(file_handler)
     return logger
+
+def init_logger_process(site_name, logger_queue):
+    logger = init_log(site_name=site_name)
+    while True:
+        while not logger_queue.empty():
+            message_info = logger_queue.get()
+            log_type = message_info[0]
+            log_pid = message_info[1]
+
+            log_filename = message_info[2]
+            log_linenum = message_info[3]
+            
+            log_message = message_info[4]
+            log_args = message_info[5]
+            log_kargs = message_info[6]
+
+            before_message = f'{log_pid} | {log_filename}:{log_linenum} | '
+            
+            log_func = None
+            if log_type == logging.INFO:
+                log_func = logger.info
+            if log_type == logging.ERROR:
+                log_func = logger.error
+            if log_type == logging.WARNING:
+                log_func = logger.warning
+            if log_type == logging.CRITICAL:
+                log_func = logger.critical
+            log_func(f'{before_message}{log_message}', *log_args, **log_kargs)

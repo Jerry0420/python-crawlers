@@ -1,10 +1,9 @@
 from collections import namedtuple
 from enum import Enum
 import json
-import logging
 import os
 import multiprocessing
-from .logger_util import LoggerToQueue, init_log
+from .logger_util import LoggerToQueue, init_logger_process
 
 class Parser(Enum):
     LXML = 'lxml'
@@ -16,8 +15,6 @@ Info = namedtuple('Info', ['current_info', 'next_info', 'retry_info'])
 class CrawlerUtil:
 
     database = None
-    logger_process: multiprocessing.Process = None
-    logger: LoggerToQueue = None
     
     def __init__(self, database, site_name='') -> None:
         self.collected_data = []
@@ -25,42 +22,14 @@ class CrawlerUtil:
         self.total_count = 0
         self.site_name = site_name
 
-        logger_queue = multiprocessing.Queue()
-        logger_process = multiprocessing.Process(target=self.init_logger_process, args=(logger_queue,))
+        manager = multiprocessing.Manager()
+        logger_queue = manager.Queue()
+        logger_process = multiprocessing.Process(target=init_logger_process, args=(site_name, logger_queue,))
         logger_process.start()
 
-        self.__class__.logger_process = logger_process
-        self.__class__.logger = LoggerToQueue(logger_queue)
+        self.logger_process = logger_process
+        self.logger = LoggerToQueue(logger_queue)
         self.__class__.database = database
-
-    def init_logger_process(self, logger_queue):
-        logger = init_log(site_name=self.site_name)
-        while True:
-            while not logger_queue.empty():
-                message_info = logger_queue.get()
-                log_type = message_info[0]
-                log_pid = message_info[1]
-
-                log_filename = message_info[2]
-                log_linenum = message_info[3]
-                
-                log_message = message_info[4]
-                log_args = message_info[5]
-                log_kargs = message_info[6]
-
-                before_message = f'{log_pid} | {log_filename}:{log_linenum} | '
-                
-                log_func = None
-                if log_type == logging.INFO:
-                    log_func = logger.info
-                if log_type == logging.ERROR:
-                    log_func = logger.error
-                if log_type == logging.WARNING:
-                    log_func = logger.warning
-                if log_type == logging.CRITICAL:
-                    log_func = logger.critical
-
-                log_func(f'{before_message}{log_message}', *log_args, **log_kargs)
 
     def append(self, data):
         self.collected_data.extend(data)
@@ -69,8 +38,8 @@ class CrawlerUtil:
 
     def save(self):
         self.total_count += len(self.collected_data)
-        self.__class__.logger.info("Saved %s into database", len(self.collected_data))
-        self.__class__.database.save(self.collected_data)
+        self.logger.info("Saved %s into database", len(self.collected_data))
+        self.database.save(self.collected_data)
         self.collected_data = []
 
     def save_retry_info(self):
@@ -87,8 +56,8 @@ class CrawlerUtil:
     def close(self, session, loop):
         loop.run_until_complete(session.close())
         
-        self.__class__.logger_process.join(timeout=5)
-        self.__class__.logger_process.terminate()
+        self.logger_process.join(timeout=5)
+        self.logger_process.terminate()
         
         loop.stop()
         loop.run_forever()
@@ -96,7 +65,7 @@ class CrawlerUtil:
 
     def map(self, pool, function, inputs):
         all_next_info = []
-        results_with_all_info = pool.imap_unordered(function, inputs)
+        results_with_all_info = pool.imap_unordered(function, inputs, )
         for result_with_all_info in results_with_all_info:
             result = []
             if isinstance(result_with_all_info, tuple):
