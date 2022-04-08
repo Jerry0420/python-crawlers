@@ -7,6 +7,10 @@ from sqlalchemy.orm import sessionmaker
 import csv
 import logging
 from enum import Enum
+from typing import Union, List, Dict, Any
+from sqlalchemy.orm.decl_api import DeclarativeMeta
+from sqlalchemy.engine.base import Engine
+from sqlalchemy.orm.session import Session
 
 logger = logging.getLogger(__name__)
 
@@ -15,26 +19,8 @@ class DataBaseType(Enum):
     JSON = 'JSON' #  init_database(database_type=DataBaseType.CSV, file_name=site_name, fields=['title', 'id'])
     CSV = 'CSV' # init_database(database_type=DataBaseType.JSON, file_name=site_name, fields=None)
 
-def init_database(
-        database_type: DataBaseType=DataBaseType.DATABASE, 
-        file_name: str='',
-        fields=None,
-        path=os.getcwd(), 
-    ):
-    if database_type is DataBaseType.DATABASE and fields and not isinstance(fields, list):
-        database = DatabaseUtil(table=fields, path=path, file_name=file_name)
-    
-    elif database_type is DataBaseType.JSON and not fields:
-        database = JsonUtil(path=path, file_name=file_name)
-    
-    elif database_type is DataBaseType.CSV and fields and isinstance(fields, list):
-        database = CsvUtil(path=path, file_name=file_name, field_names=fields)
-    
-    return database
-
 class DatabaseUtil:
-    
-    def __init__(self, table, path='', file_name=''):
+    def __init__(self, table: DeclarativeMeta, path: str='', file_name: str=''):
         self.table = table
         self.path = path + '/data'
         self.file_name = file_name + "_{:%Y-%m-%d_%H-%M-%S}".format(datetime.now()) + ".sqlite3"
@@ -43,19 +29,19 @@ class DatabaseUtil:
             if not os.path.exists(self.path):
                 os.makedirs(self.path)
             Path(self.path + '/' + self.file_name).touch()
-            self.engine = create_engine('sqlite:///{}'.format(self.path + '/' + self.file_name))
+            self.engine: Engine = create_engine('sqlite:///{}'.format(self.path + '/' + self.file_name))
             self.table.metadata.create_all(self.engine)
         except Exception as error:
             logger.exception(error)
             exit()
 
     @property
-    def session(self):
+    def session(self) -> Session:
         Session = sessionmaker(bind=self.engine)
         _session = Session()
         return _session
 
-    def save(self, data):
+    def save(self, data: List[Dict[str, Any]]):
         try:
             session = self.session
             session.bulk_insert_mappings(self.table, data)
@@ -66,7 +52,7 @@ class DatabaseUtil:
             session.close()
 
 class JsonUtil:
-    def __init__(self, path='', file_name=''):
+    def __init__(self, path: str='', file_name: str=''):
         self.path = path + '/data'
         self.file_name = file_name + "_{:%Y-%m-%d_%H-%M-%S}".format(datetime.now())
 
@@ -77,8 +63,8 @@ class JsonUtil:
             logger.exception(error)
             exit()
 
-    def save(self, data):
-        origin_data = []
+    def save(self, data: List[Dict[str, Any]]):
+        origin_data: List[Dict[str, Any]] = []
         
         try:
             with open(self.path + '/' + self.file_name + '.json', 'r') as json_file:
@@ -95,7 +81,7 @@ class JsonUtil:
                 logger.exception(error)
 
 class CsvUtil:
-    def __init__(self, path='', file_name='', field_names=[]):
+    def __init__(self, path: str='', file_name: str='', field_names: List[str]=[]):
         self.path = path + '/data'
         self.file_name = file_name + "_{:%Y-%m-%d_%H-%M-%S}".format(datetime.now())
         self.field_names = field_names
@@ -107,7 +93,7 @@ class CsvUtil:
             logger.exception(error)
             exit()
 
-    def save(self, data):
+    def save(self, data: List[Dict[str, Any]]):
         origin_data = []
         
         try:
@@ -126,3 +112,20 @@ class CsvUtil:
                 os.rename(self.path + '/' + self.file_name + '_tmp.csv', self.path + '/' + self.file_name + '.csv')
             except Exception as error:
                 logger.exception(error)
+
+def init_database(
+        database_type: DataBaseType=DataBaseType.DATABASE, 
+        file_name: str='',
+        fields: Union[DeclarativeMeta, List[str], None]=None,
+        path: str=os.getcwd(), 
+    ) -> Union[DatabaseUtil, JsonUtil, CsvUtil]:
+    if database_type is DataBaseType.DATABASE and fields and not isinstance(fields, list):
+        database = DatabaseUtil(table=fields, path=path, file_name=file_name)
+    
+    elif database_type is DataBaseType.JSON and not fields:
+        database = JsonUtil(path=path, file_name=file_name)
+    
+    elif database_type is DataBaseType.CSV and fields and isinstance(fields, list):
+        database = CsvUtil(path=path, file_name=file_name, field_names=fields)
+    
+    return database
