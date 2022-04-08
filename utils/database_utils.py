@@ -52,8 +52,8 @@ class DatabaseUtil:
     @property
     def session(self):
         Session = sessionmaker(bind=self.engine)
-        session = Session()
-        return session
+        _session = Session()
+        return _session
 
     def save(self, data):
         try:
@@ -62,6 +62,8 @@ class DatabaseUtil:
             session.commit()
         except Exception as error:
             logger.exception(error)
+        finally:
+            session.close()
 
 class JsonUtil:
     def __init__(self, path='', file_name=''):
