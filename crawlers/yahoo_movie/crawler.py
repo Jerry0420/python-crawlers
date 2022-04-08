@@ -124,4 +124,4 @@ if __name__ == "__main__":
     parser.add_argument("-p", "--processes", help="crawl with n processes", type=int, default=(multiprocessing.cpu_count() - 1))
     args = parser.parse_args()
 
-    start_crawler(args.processes, 200, 10)
+    start_crawler(args.processes, 12900, 100)
