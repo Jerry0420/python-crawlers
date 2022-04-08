@@ -26,7 +26,7 @@ class LoggerToQueue:
         current_stack = inspect.stack()[1]
         self.logger_queue.put([logging.CRITICAL, os.getpid(), current_stack[1], current_stack[2], message, args, kwargs])
 
-def init_log(path: str=os.getcwd(), site_name: str=''):
+def init_log(path: str=os.getcwd(), site_name: str='') -> logging.Logger:
     logging.captureWarnings(True)
     
     logger = logging.getLogger(site_name)

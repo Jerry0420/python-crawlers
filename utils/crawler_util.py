@@ -4,6 +4,10 @@ import json
 import os
 import multiprocessing
 from .logger_util import LoggerToQueue, init_logger_process
+from .database_utils import DatabaseUtil, JsonUtil, CsvUtil
+from typing import Union, List, Dict, Any, Tuple, Iterator, Callable
+from .http_utils import AsyncRequestUtil
+from multiprocessing.pool import Pool
 
 class Parser(Enum):
     LXML = 'lxml'
@@ -14,9 +18,9 @@ Info = namedtuple('Info', ['current_info', 'next_info', 'retry_info'])
 
 class CrawlerUtil:
 
-    database = None
+    database: Union[DatabaseUtil, JsonUtil, CsvUtil] = None
     
-    def __init__(self, database, site_name='') -> None:
+    def __init__(self, database: Union[DatabaseUtil, JsonUtil, CsvUtil], site_name: str='') -> None:
         self.collected_data = []
         self.retry_info = []
         self.total_count = 0
@@ -31,7 +35,7 @@ class CrawlerUtil:
         self.logger = LoggerToQueue(logger_queue)
         self.__class__.database = database
 
-    def append(self, data):
+    def append(self, data: List[Dict[str, Any]]):
         self.collected_data.extend(data)
         if len(self.collected_data) >= 1000:
             self.save()
@@ -53,19 +57,14 @@ class CrawlerUtil:
             json.dump(previous_retry_info, f, ensure_ascii=False)
         self.retry_info = []
 
-    def close(self, session, loop):
-        loop.run_until_complete(session.close())
-        
+    async def close(self, session: AsyncRequestUtil):
+        await session.close()
         self.logger_process.join(timeout=5)
         self.logger_process.terminate()
-        
-        loop.stop()
-        loop.run_forever()
-        loop.close()
 
-    def map(self, pool, function, inputs):
+    def map(self, pool: Pool, function: Callable[[Any], Any], inputs: List[Any]):
         all_next_info = []
-        results_with_all_info = pool.imap_unordered(function, inputs, )
+        results_with_all_info: Iterator[Union[Tuple[List[Any], Info], List[Any]]] = pool.imap_unordered(function, inputs, )
         for result_with_all_info in results_with_all_info:
             result = []
             if isinstance(result_with_all_info, tuple):

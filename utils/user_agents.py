@@ -14,7 +14,7 @@ class Browser(Enum):
 
 UserAgentType = namedtuple('UserAgentType', ['os', 'browser'])
 
-def get_user_agent(user_agent_type: UserAgentType):
+def get_user_agent(user_agent_type: UserAgentType) -> str:
     user_agent = ""
     try:
         with open('user_agents.json', 'r') as json_file:

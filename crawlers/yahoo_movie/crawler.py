@@ -11,7 +11,6 @@ from utils.http_utils import AsyncRequestUtil
 from utils.logger_util import LoggerToQueue
 from table import YahooMovie
 from multiprocessing import Pool
-import multiprocessing
 from datetime import datetime
 import re
 from functools import partial
@@ -98,30 +97,29 @@ async def request_page(url):
     response = await session.get(url=url)
     return response
 
-def start_crawler(process_num, upper_limit, chunk_size):
+async def start_crawler(process_num, upper_limit, chunk_size):
     pool = Pool(processes=process_num)
     inputs_chunks = split_chunk(
-        [request_page(f"https://movies.yahoo.com.tw/movieinfo_main.html/id={i}".format(i)) for i in range(1, upper_limit)], 
+        [asyncio.create_task(request_page(f"https://movies.yahoo.com.tw/movieinfo_main.html/id={i}".format(i))) for i in range(1, upper_limit)], 
         chunk_size
     )
     try:
         for inputs_chunk in inputs_chunks:
             try:
-                done_response, pending = loop.run_until_complete(asyncio.wait(inputs_chunk))
-                all_page_dom = [response.result() for response in done_response]
-                _ = crawler_util.map(pool, partial(get_page, crawler_util.logger), all_page_dom)
+                all_doms = await asyncio.gather(*inputs_chunk, return_exceptions=False)
+                _ = crawler_util.map(pool, partial(get_page, crawler_util.logger), all_doms)
             except Exception as error:
                 crawler_util.logger.error(error)
     except KeyboardInterrupt as error:
         pass
     finally:
         crawler_util.save()
-        crawler_util.close(session=session, loop=loop)
+        await crawler_util.close(session=session)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-p", "--processes", help="crawl with n processes", type=int, default=(multiprocessing.cpu_count() - 1))
+    parser.add_argument("-p", "--processes", help="crawl with n processes", type=int, default=8)
     args = parser.parse_args()
-
-    start_crawler(args.processes, 12900, 100)
+    # loop.run_until_complete(start_crawler(args.processes, 12900, 10))
+    loop.run_until_complete(start_crawler(args.processes, 10, 2))

@@ -43,7 +43,6 @@ class AsyncRequestUtil:
             user_agent_type: UserAgentType=UserAgentType(OS.MACOS, Browser.CHROME)
         ):
         
-        self.loop = asyncio.get_event_loop()
         self.session = aiohttp.ClientSession()
         self.main_page_url = main_page_url
         self.retry_times = retry_times
@@ -106,10 +105,10 @@ class AsyncRequestUtil:
             query_strings: Optional[Dict[str, str]]=None, 
             headers: Union[str, Dict[str, str], None]=None, 
             cookies: Union[str, Dict[str, str], None]=None, 
-            referer: str=None, 
+            referer: Optional[str]=None, 
             allow_redirects: bool=True, 
             json_response: bool=False, 
-            retry_function=None
+            retry_function: Optional[Callable[[Any], bool]]=None
         ) -> Union[None, Dict[str, Any], bytes]:
         response = await self.__request(
                 self.session.get, 
@@ -134,10 +133,10 @@ class AsyncRequestUtil:
             json_body: Optional[Dict[str, Any]]=None, 
             headers: Union[str, Dict[str, str], None]=None, 
             cookies: Union[str, Dict[str, str], None]=None, 
-            referer: str=None, 
+            referer: Optional[str]=None, 
             allow_redirects: bool=True, 
             json_response: bool=False,
-            retry_function=None
+            retry_function: Optional[Callable[[Any], bool]]=None
         ) -> Union[None, Dict[str, Any], bytes]:
         response = await self.__request(
                 self.session.post, 
@@ -172,10 +171,10 @@ class AsyncRequestUtil:
             json_body: Optional[Dict[str, Any]]=None, 
             headers: Union[str, Dict[str, str], None]=None, 
             cookies: Union[str, Dict[str, str], None]=None, 
-            referer: str=None, 
+            referer: Optional[str]=None, 
             allow_redirects: bool=True, 
             json_response: bool=False,
-            retry_function=None
+            retry_function: Optional[Callable[[Any], bool]]=None
         ) -> Union[None, Dict[str, Any], bytes]:
 
         if referer:
@@ -192,7 +191,6 @@ class AsyncRequestUtil:
             self.cookies.update(cookies)
 
         retry_function = retry_function if retry_function else self.__retry_function
-
         for _ in range(self.retry_times):
             try:
                 response = await method(
