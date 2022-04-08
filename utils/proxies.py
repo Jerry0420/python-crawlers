@@ -1,12 +1,13 @@
 import random
 import json
 from enum import Enum
+from typing import List
 
 class Countries(Enum):
     # TODO: add countries
     TW = 'tw'
 
-def get_proxy(country_list):
+def get_proxy(country_list: List[str]):
     data = None
     proxy = None
     try:

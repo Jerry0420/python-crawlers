@@ -1,13 +1,13 @@
 import logging
 import os
-import platform
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
 import inspect
+from multiprocessing.queues import Queue
 
 class LoggerToQueue:
     
-    def __init__(self, logger_queue) -> None:
+    def __init__(self, logger_queue: Queue) -> None:
         self.logger_queue = logger_queue
 
     def info(self, message, *args, **kwargs):
@@ -25,18 +25,8 @@ class LoggerToQueue:
     def critical(self, message, *args, **kwargs):
         current_stack = inspect.stack()[1]
         self.logger_queue.put([logging.CRITICAL, os.getpid(), current_stack[1], current_stack[2], message, args, kwargs])
-        
-def creation_date(file_path):
-    if platform.system() == 'Windows':
-        return os.path.getctime(file_path)
-    else:
-        stat = os.stat(file_path)
-        try:
-            return stat.st_birthtime
-        except AttributeError:
-            return stat.st_ctime
 
-def init_log(path=os.getcwd(), site_name=''):
+def init_log(path: str=os.getcwd(), site_name: str=''):
     logging.captureWarnings(True)
     
     logger = logging.getLogger(site_name)
@@ -62,7 +52,7 @@ def init_log(path=os.getcwd(), site_name=''):
     logger.addHandler(file_handler)
     return logger
 
-def init_logger_process(site_name, logger_queue):
+def init_logger_process(site_name: str, logger_queue: Queue):
     logger = init_log(site_name=site_name)
     while True:
         while not logger_queue.empty():
