@@ -95,7 +95,7 @@ def get_page(logger: LoggerToQueue, document):
     return [result]
 
 async def request_page(url):
-    response = await session.get(url=url, json_response=True)
+    response = await session.get(url=url)
     return response
 
 def start_crawler(process_num, upper_limit, chunk_size):
@@ -124,4 +124,4 @@ if __name__ == "__main__":
     parser.add_argument("-p", "--processes", help="crawl with n processes", type=int, default=(multiprocessing.cpu_count() - 1))
     args = parser.parse_args()
 
-    start_crawler(args.processes, 10, 1)
+    start_crawler(args.processes, 200, 10)
