@@ -1,5 +1,8 @@
 import os
+from pydoc import doc
 import sys
+import traceback
+from typing import Any, Dict, List, Tuple, Union
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/../../")
 
 from bs4 import BeautifulSoup
@@ -19,15 +22,18 @@ from utils.helper import split_chunk
 site_name = 'yahoo_movie'
 main_page_url = "https://movies.yahoo.com.tw/index.html"
 database = init_database(database_type=DataBaseType.DATABASE, file_name=site_name, fields=YahooMovie)
-session = AsyncRequestUtil(main_page_url=main_page_url)
-loop = asyncio.get_event_loop()
 crawler_util = CrawlerUtil(database=database, site_name=site_name)
 
-def get_page(logger: LoggerToQueue, document):
+def get_page(logger: LoggerToQueue, document: bytes):
     document = BeautifulSoup(document, 'lxml')
     result = {}
+
+    if not document:
+        return [], None
+    
     url_block = document.select_one('meta[property="og:url"]')
-    if url_block and  '/id=' not in url_block['content']: return []
+    if not url_block or url_block and  '/id=' not in url_block['content']: 
+        return [], None
 
     movie_info_block = document.select_one('.movie_intro_info_r')
     name_ch_block = movie_info_block.select_one('h1') if movie_info_block else ''
@@ -88,38 +94,60 @@ def get_page(logger: LoggerToQueue, document):
         vote_count = re.findall(r'\d+', vote_count)
         result['vote_count'] = int(vote_count[0]) if vote_count else 0
     except Exception as error:
+        traceback.print_exc()
         logger.error("Error occurred %s ", result['url'])
         return [], Info(current_info=None, next_info=None, retry_info=result['url'])
     logger.info("Crawled %s", result['url'])
-    return [result]
+    return [result], None
 
-async def request_page(url):
-    response = await session.get(url=url)
-    return response
+def retry_function(status_code: int, response: Union[Dict[str, Any], bytes, None], **kwargs) -> bool:
+    result = False
+    if status_code in [200, 204] and response:
+        result = True
+    if status_code == 302:
+        result = True
+    return result
 
-async def start_crawler(process_num, upper_limit, chunk_size):
+def request_page(logger: LoggerToQueue, inputs_chunk: List[str]) -> Tuple[List[Dict[str, Any]], List[Info]]:
+    data_of_urls = []
+    info_of_urls = []
+    try:
+        loop = asyncio.new_event_loop()
+        session = AsyncRequestUtil(main_page_url=main_page_url, loop=loop)
+        for url in inputs_chunk:
+            dom = loop.run_until_complete(session.get(url, allow_redirects=False, retry_function=retry_function))
+            data_per_url, info = get_page(logger, dom)
+            if data_per_url:
+                data_of_urls.extend(data_per_url)
+            if info:
+                info_of_urls.extend(info)
+        asyncio.run(session.close())
+    except Exception as error:
+        traceback.print_exc()
+        logger.error(error)
+    finally:
+        return data_of_urls, info_of_urls
+
+def start_crawler(process_num, upper_limit, chunk_size):
     pool = Pool(processes=process_num)
     inputs_chunks = split_chunk(
-        [asyncio.create_task(request_page(f"https://movies.yahoo.com.tw/movieinfo_main.html/id={i}".format(i))) for i in range(1, upper_limit)], 
+        [f"https://movies.yahoo.com.tw/movieinfo_main.html/id={i}" for i in range(1, upper_limit)], 
         chunk_size
     )
     try:
-        for inputs_chunk in inputs_chunks:
-            try:
-                all_doms = await asyncio.gather(*inputs_chunk, return_exceptions=False)
-                _ = crawler_util.map(pool, partial(get_page, crawler_util.logger), all_doms)
-            except Exception as error:
-                crawler_util.logger.error(error)
-    except KeyboardInterrupt as error:
-        pass
+        _ = crawler_util.imap(pool, partial(request_page, crawler_util.logger), inputs_chunks)
+    except Exception as error:
+        traceback.print_exc()
+        crawler_util.logger.error(error)
     finally:
         crawler_util.save()
-        await crawler_util.close(session=session)
-
+        crawler_util.logger.info('Total saved %s into database.', crawler_util.total_count)
+        crawler_util.close()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-p", "--processes", help="crawl with n processes", type=int, default=8)
+    parser.add_argument("-p", "--processes", help="crawl with n processes", type=int, default=5)
+    parser.add_argument("-c", "--chunk_size", help="size of tasks inside one process.", type=int, default=20)
+    parser.add_argument("-u", "--upper_limit", help="upper limit of this website.", type=int, default=12900)
     args = parser.parse_args()
-    # loop.run_until_complete(start_crawler(args.processes, 12900, 10))
-    loop.run_until_complete(start_crawler(args.processes, 10, 2))
+    start_crawler(args.processes, args.upper_limit, args.chunk_size)
