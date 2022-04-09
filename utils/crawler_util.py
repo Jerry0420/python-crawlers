@@ -25,15 +25,16 @@ class CrawlerUtil:
         self.retry_info = []
         self.total_count = 0
         self.site_name = site_name
+        self.__class__.database = database
 
+    def init_logger_process_and_logger(self):
         manager = multiprocessing.Manager()
         logger_queue = manager.Queue()
-        logger_process = multiprocessing.Process(target=init_logger_process, args=(site_name, logger_queue,))
+        logger_process = multiprocessing.Process(target=init_logger_process, args=(self.site_name, logger_queue,))
         logger_process.start()
 
         self.logger_process = logger_process
         self.logger = LoggerToQueue(logger_queue)
-        self.__class__.database = database
 
     def extend(self, data: List[Dict[str, Any]]):
         self.collected_data.extend(data)

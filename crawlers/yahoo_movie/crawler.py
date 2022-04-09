@@ -129,7 +129,10 @@ def request_page(logger: LoggerToQueue, inputs_chunk: List[str]) -> Tuple[List[D
         return data_of_urls, info_of_urls
 
 def start_crawler(process_num, upper_limit, chunk_size):
+    # must init all processes inside main function.
     pool = Pool(processes=process_num)
+    crawler_util.init_logger_process_and_logger()
+
     inputs_chunks = split_chunk(
         [f"https://movies.yahoo.com.tw/movieinfo_main.html/id={i}" for i in range(1, upper_limit)], 
         chunk_size
