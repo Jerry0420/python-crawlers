@@ -40,10 +40,12 @@ class AsyncRequestUtil:
             cookies: Union[str, Dict[str, str]]={}, 
             timeout: int=30, 
             proxy_countries: List[str]=None, 
-            user_agent_type: UserAgentType=UserAgentType(OS.MACOS, Browser.CHROME)
+            user_agent_type: UserAgentType=UserAgentType(OS.MACOS, Browser.CHROME),
+            loop: asyncio.AbstractEventLoop=None
         ):
         
-        self.session = aiohttp.ClientSession()
+        self.loop = loop
+        self.session = aiohttp.ClientSession(loop=loop)
         self.main_page_url = main_page_url
         self.retry_times = retry_times
         self.timeout = timeout
@@ -91,6 +93,7 @@ class AsyncRequestUtil:
 
     async def close(self):
         await self.session.close()
+        self.loop.close()
 
     async def init_cookie(self):
         if self.main_page_url:
@@ -153,13 +156,13 @@ class AsyncRequestUtil:
             )
         return response
 
-    def __retry_function(self, status_code: int, response: Union[Dict[str, Any], bytes, None]) -> bool:
+    def __retry_function(self, status_code: int, response: Union[Dict[str, Any], bytes, None], **kwargs) -> bool:
         result = False
         try:
             if status_code in [200, 204] and response:
                 result = True
         except Exception as error:
-            logger.warning('Retry %s', response.url)
+            logger.warning('Retry %s', kwargs['url'])
         return result
 
     async def __request(
@@ -206,14 +209,26 @@ class AsyncRequestUtil:
                     ssl=False
                 )
                 
-                if json_response:
-                    if not retry_function(response.status, await response.json()):
-                        raise
+                status_code = 0
+
+                if json_response:   
+                    status_code = response.status
                     response = await response.json()
                 else:
-                    if not retry_function(response.status, await response.read()):
-                        raise
+                    status_code = response.status
                     response = await response.read()
+                
+                if not retry_function(
+                            status_code=status_code, 
+                            response=response, 
+                            url=url, 
+                            query_strings=query_strings, 
+                            body=body, 
+                            json_body=json_body, 
+                            headers=headers, 
+                            cookies=cookies
+                        ):
+                        raise
                 break
             except Exception as error:
                 await self.reset()
