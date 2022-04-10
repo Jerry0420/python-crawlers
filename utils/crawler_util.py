@@ -2,11 +2,10 @@ from collections import namedtuple
 from enum import Enum
 import json
 import os
-import multiprocessing
-import time
-from .logger_util import LoggerToQueue, init_logger_process
+
+from utils.logger_util import LogToQueue, LoggerUtil
 from .database_utils import DatabaseUtil, JsonUtil, CsvUtil
-from typing import Union, List, Dict, Any, Tuple, Iterator, Callable
+from typing import Optional, Union, List, Dict, Any, Tuple, Iterator, Callable
 from multiprocessing.pool import Pool
 
 class Parser(Enum):
@@ -18,23 +17,14 @@ Info = namedtuple('Info', ['current_info', 'next_info', 'retry_info'])
 
 class CrawlerUtil:
 
-    database: Union[DatabaseUtil, JsonUtil, CsvUtil] = None
+    database: Union[DatabaseUtil, JsonUtil, CsvUtil, None] = None
     
-    def __init__(self, database: Union[DatabaseUtil, JsonUtil, CsvUtil], site_name: str='') -> None:
+    def __init__(self, database: Union[DatabaseUtil, JsonUtil, CsvUtil], logger_util: Optional[LoggerUtil]) -> None:
         self.collected_data = []
         self.retry_info = []
         self.total_count = 0
-        self.site_name = site_name
         self.__class__.database = database
-
-    def init_logger_process_and_logger(self):
-        manager = multiprocessing.Manager()
-        logger_queue = manager.Queue()
-        logger_process = multiprocessing.Process(target=init_logger_process, args=(self.site_name, logger_queue,))
-        logger_process.start()
-
-        self.logger_process = logger_process
-        self.logger = LoggerToQueue(logger_queue)
+        self.logger_util = logger_util
 
     def extend(self, data: List[Dict[str, Any]]):
         self.collected_data.extend(data)
@@ -43,7 +33,7 @@ class CrawlerUtil:
 
     def save(self):
         self.total_count += len(self.collected_data)
-        self.logger.info("Saved %s into database", len(self.collected_data))
+        self.logger_util.logger.info("Saved %s into database", len(self.collected_data))
         self.database.save(self.collected_data)
         self.collected_data = []
 
@@ -58,10 +48,8 @@ class CrawlerUtil:
             json.dump(previous_retry_info, f, ensure_ascii=False)
         self.retry_info = []
 
-    def close(self):
-        time.sleep(3)
-        self.logger_process.join(timeout=5)
-        self.logger_process.terminate()
+    def close(self, pool: Pool):
+        pool.terminate()
 
     def imap(self, pool: Pool, function: Callable[[Any], Any], inputs: List[Any]) -> List[Any]:
         all_next_info = []

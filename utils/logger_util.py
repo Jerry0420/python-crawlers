@@ -1,15 +1,39 @@
 import logging
+from optparse import Option
 import os
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
 import inspect
+import multiprocessing
 from multiprocessing.queues import Queue
+import time
+from typing import Optional
 
-class LoggerToQueue:
-    
-    def __init__(self, logger_queue: Queue) -> None:
+class LoggerUtil:
+
+    def __init__(self, site_name: str='') -> None:
+        self.site_name = site_name
+        self.logger_process: Optional[multiprocessing.Process] = None
+        self.logger: Optional[LogToQueue] = None
+
+    def init_logger_process_and_logger(self):
+        manager = multiprocessing.Manager()
+        logger_queue = manager.Queue()
+        logger_process = multiprocessing.Process(target=init_logger_process, args=(self.site_name, logger_queue,))
+        logger_process.start()
+
+        self.logger_process = logger_process
+        self.logger = LogToQueue(logger_queue=logger_queue)
+
+    def close(self):
+        time.sleep(3)
+        self.logger_process.join(timeout=5)
+        self.logger_process.terminate()
+
+class LogToQueue:
+    def __init__(self, logger_queue: Optional[Queue]) -> None:
         self.logger_queue = logger_queue
-
+    
     def info(self, message, *args, **kwargs):
         current_stack = inspect.stack()[1]
         self.logger_queue.put([logging.INFO, os.getpid(), current_stack[1], current_stack[2], message, args, kwargs])

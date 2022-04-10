@@ -1,5 +1,4 @@
 import os
-from pydoc import doc
 import sys
 import traceback
 from typing import Any, Dict, List, Tuple, Union
@@ -11,7 +10,7 @@ import asyncio
 from utils.crawler_util import CrawlerUtil, Info
 from utils.database_utils import init_database, DataBaseType
 from utils.http_utils import AsyncRequestUtil
-from utils.logger_util import LoggerToQueue
+from utils.logger_util import LoggerUtil, LogToQueue
 from table import YahooMovie
 from multiprocessing import Pool
 from datetime import datetime
@@ -21,10 +20,11 @@ from utils.helper import split_chunk
 
 site_name = 'yahoo_movie'
 main_page_url = "https://movies.yahoo.com.tw/index.html"
-database = init_database(database_type=DataBaseType.DATABASE, file_name=site_name, fields=YahooMovie)
-crawler_util = CrawlerUtil(database=database, site_name=site_name)
+logger_util = LoggerUtil(site_name=site_name)
+database = init_database(database_type=DataBaseType.DATABASE, file_name=site_name, fields=YahooMovie, logger_util=logger_util)
+crawler_util = CrawlerUtil(database=database, logger_util=logger_util)
 
-def get_page(logger: LoggerToQueue, document: bytes):
+def get_page(logger: LogToQueue, document: bytes):
     document = BeautifulSoup(document, 'lxml')
     result = {}
 
@@ -108,12 +108,12 @@ def retry_function(status_code: int, response: Union[Dict[str, Any], bytes, None
         result = True
     return result
 
-def request_page(logger: LoggerToQueue, inputs_chunk: List[str]) -> Tuple[List[Dict[str, Any]], List[Info]]:
+def request_page(logger: LogToQueue, inputs_chunk: List[str]) -> Tuple[List[Dict[str, Any]], List[Info]]:
     data_of_urls = []
     info_of_urls = []
     try:
         loop = asyncio.new_event_loop()
-        session = AsyncRequestUtil(main_page_url=main_page_url, loop=loop)
+        session = AsyncRequestUtil(main_page_url=main_page_url, loop=loop, logger=logger)
         for url in inputs_chunk:
             dom = loop.run_until_complete(session.get(url, allow_redirects=False, retry_function=retry_function))
             data_per_url, info = get_page(logger, dom)
@@ -131,21 +131,23 @@ def request_page(logger: LoggerToQueue, inputs_chunk: List[str]) -> Tuple[List[D
 def start_crawler(process_num, upper_limit, chunk_size):
     # must init all processes inside main function.
     pool = Pool(processes=process_num)
-    crawler_util.init_logger_process_and_logger()
+    logger_util.init_logger_process_and_logger()
 
     inputs_chunks = split_chunk(
         [f"https://movies.yahoo.com.tw/movieinfo_main.html/id={i}" for i in range(1, upper_limit)], 
         chunk_size
     )
     try:
-        _ = crawler_util.imap(pool, partial(request_page, crawler_util.logger), inputs_chunks)
+        _ = crawler_util.imap(pool, partial(request_page, logger_util.logger), inputs_chunks)
     except Exception as error:
         traceback.print_exc()
-        crawler_util.logger.error(error)
+        logger_util.logger.error(error)
     finally:
         crawler_util.save()
-        crawler_util.logger.info('Total saved %s into database.', crawler_util.total_count)
-        crawler_util.close()
+        logger_util.logger.info('Total saved %s into database.', crawler_util.total_count)
+
+        logger_util.close()
+        crawler_util.close(pool=pool)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

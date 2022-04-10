@@ -8,5 +8,5 @@ exec:
 	docker exec -it crawlers sh
 
 clean:
-	rm -r $(path)data
-	rm -r $(path)logs
+	rm -r $(path)/data
+	rm -r $(path)/logs
