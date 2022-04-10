@@ -96,7 +96,7 @@ def get_page(logger: LogToQueue, document: bytes):
     except Exception as error:
         traceback.print_exc()
         logger.error("Error occurred %s ", result['url'])
-        return [], Info(current_info=None, next_info=None, retry_info=result['url'])
+        return [], Info(next_info=None, retry_info=result['url'])
     logger.info("Crawled %s", result['url'])
     return [result], None
 
