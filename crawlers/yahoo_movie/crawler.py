@@ -21,7 +21,7 @@ from utils.helper import split_chunk
 site_name = 'yahoo_movie'
 main_page_url = "https://movies.yahoo.com.tw/index.html"
 logger_util = LoggerUtil(site_name=site_name)
-database = init_database(database_type=DataBaseType.DATABASE, file_name=site_name, fields=YahooMovie, logger=logger_util.logger)
+database = init_database(database_type=DataBaseType.DATABASE, file_name=site_name, fields=YahooMovie, logger_util=logger_util)
 crawler_util = CrawlerUtil(database=database, logger_util=logger_util)
 
 def get_page(logger: LogToQueue, document: bytes):
