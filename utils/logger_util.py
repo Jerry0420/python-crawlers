@@ -8,6 +8,7 @@ import multiprocessing
 from multiprocessing.queues import Queue
 import time
 from typing import Optional
+import traceback
 
 class LoggerUtil:
 
@@ -39,6 +40,7 @@ class LogToQueue:
         self.logger_queue.put([logging.INFO, os.getpid(), current_stack[1], current_stack[2], message, args, kwargs])
         
     def error(self, message, *args, **kwargs):
+        traceback.print_exc()
         current_stack = inspect.stack()[1]
         self.logger_queue.put([logging.ERROR, os.getpid(), current_stack[1], current_stack[2], message, args, kwargs])
         

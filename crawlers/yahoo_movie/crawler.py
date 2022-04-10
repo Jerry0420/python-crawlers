@@ -21,7 +21,7 @@ from utils.helper import split_chunk
 site_name = 'yahoo_movie'
 main_page_url = "https://movies.yahoo.com.tw/index.html"
 logger_util = LoggerUtil(site_name=site_name)
-database = init_database(database_type=DataBaseType.DATABASE, file_name=site_name, fields=YahooMovie, logger_util=logger_util)
+database = init_database(database_type=DataBaseType.DATABASE, site_name=site_name, fields=YahooMovie, logger_util=logger_util)
 crawler_util = CrawlerUtil(database=database, logger_util=logger_util)
 
 def get_page(logger: LogToQueue, document: bytes):
@@ -94,7 +94,6 @@ def get_page(logger: LogToQueue, document: bytes):
         vote_count = re.findall(r'\d+', vote_count)
         result['vote_count'] = int(vote_count[0]) if vote_count else 0
     except Exception as error:
-        traceback.print_exc()
         logger.error("Error occurred %s ", result['url'])
         return [], Info(next_info=None, retry_info=result['url'])
     logger.info("Crawled %s", result['url'])
@@ -123,7 +122,6 @@ def request_page(logger: LogToQueue, inputs_chunk: List[str]) -> Tuple[List[Dict
                 info_of_urls.extend(info)
         asyncio.run(session.close())
     except Exception as error:
-        traceback.print_exc()
         logger.error(error)
     finally:
         return data_of_urls, info_of_urls
@@ -140,7 +138,6 @@ def start_crawler(process_num, upper_limit, chunk_size):
     try:
         _ = crawler_util.imap(pool, partial(request_page, logger_util.logger), inputs_chunks)
     except Exception as error:
-        traceback.print_exc()
         logger_util.logger.error(error)
     finally:
         crawler_util.save()

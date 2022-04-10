@@ -19,17 +19,15 @@ class DataBaseType(Enum):
     CSV = 'CSV' # init_database(database_type=DataBaseType.JSON, file_name=site_name, fields=None)
 
 class DatabaseUtil:
-    def __init__(self, table: DeclarativeMeta, path: str='', file_name: str='', logger_util: Optional[LoggerUtil]=None):
+    def __init__(self, table: DeclarativeMeta, file_path: str='', logger_util: Optional[LoggerUtil]=None):
+        self.extension = '.sqlite3'
         self.table = table
-        self.path = path + '/data'
-        self.file_name = file_name + "_{:%Y-%m-%d_%H-%M-%S}".format(datetime.now()) + ".sqlite3"
+        self.file_path = file_path
         self.logger_util = logger_util
 
         try:
-            if not os.path.exists(self.path):
-                os.makedirs(self.path)
-            Path(self.path + '/' + self.file_name).touch()
-            self.engine: Engine = create_engine('sqlite:///{}'.format(self.path + '/' + self.file_name))
+            Path(self.file_path + self.extension).touch()
+            self.engine: Engine = create_engine('sqlite:///{}'.format(self.file_path + self.extension))
             self.table.metadata.create_all(self.engine)
         except Exception as error:
             self.logger_util.logger.critical(error)
@@ -52,82 +50,82 @@ class DatabaseUtil:
             session.close()
 
 class JsonUtil:
-    def __init__(self, path: str='', file_name: str='', logger_util: Optional[LoggerUtil]=None):
-        self.path = path + '/data'
-        self.file_name = file_name + "_{:%Y-%m-%d_%H-%M-%S}".format(datetime.now())
+    def __init__(self, file_path: str='', logger_util: Optional[LoggerUtil]=None):
+        self.extension = '.json'
+        self.file_path = file_path
         self.logger_util = logger_util
-
-        try:
-            if not os.path.exists(self.path):
-                os.makedirs(self.path)
-        except Exception as error:
-            self.logger_util.logger.critical(error)
-            exit()
 
     def save(self, data: List[Dict[str, Any]]):
         origin_data: List[Dict[str, Any]] = []
         
         try:
-            with open(self.path + '/' + self.file_name + '.json', 'r') as json_file:
+            with open(self.file_path + self.extension, 'r') as json_file:
                 origin_data = json.load(json_file)
         except Exception as error:
             pass
         
-        with open(self.path + '/' + self.file_name + '_tmp.json', 'w', encoding='utf-8') as json_file:
+        with open(self.file_path + '_tmp' + self.extension, 'w', encoding='utf-8') as json_file:
             try:
                 origin_data.extend(data)
                 json.dump(origin_data, json_file, ensure_ascii=False)
-                os.rename(self.path + '/' + self.file_name + '_tmp.json', self.path + '/' + self.file_name + '.json')
+                os.rename(self.file_path + '_tmp' + self.extension, self.file_path + self.extension)
             except Exception as error:
                 self.logger_util.logger.error(error)
 
 class CsvUtil:
-    def __init__(self, path: str='', file_name: str='', field_names: List[str]=[], logger_util: Optional[LoggerUtil]=None):
-        self.path = path + '/data'
-        self.file_name = file_name + "_{:%Y-%m-%d_%H-%M-%S}".format(datetime.now())
-        self.field_names = field_names
+    def __init__(self, file_path: str='', field_names: List[str]=[], logger_util: Optional[LoggerUtil]=None):
+        self.extension = '.csv'
+        self.file_path = file_path
         self.logger_util = logger_util
-
-        try:
-            if not os.path.exists(self.path):
-                os.makedirs(self.path)
-        except Exception as error:
-            self.logger_util.logger.critical(error)
-            exit()
 
     def save(self, data: List[Dict[str, Any]]):
         origin_data = []
         
         try:
-            with open(self.path + '/' + self.file_name + '.csv', 'r', newline='') as csv_file:
+            with open(self.file_path + self.extension, 'r', newline='') as csv_file:
                 rows = csv.DictReader(csv_file)
                 origin_data = list(rows)
         except Exception as error:
             pass
         
-        with open(self.path + '/' + self.file_name + '_tmp.csv', 'w', newline='') as csv_file:
+        with open(self.file_path + '_tmp' + self.extension, 'w', newline='') as csv_file:
             try:
                 origin_data.extend(data)
                 writer = csv.DictWriter(csv_file, fieldnames=self.field_names)
                 writer.writeheader()
                 writer.writerows(origin_data)
-                os.rename(self.path + '/' + self.file_name + '_tmp.csv', self.path + '/' + self.file_name + '.csv')
+                os.rename(self.file_path + '_tmp' + self.extension, self.file_path + self.extension)
             except Exception as error:
                 self.logger_util.logger.error(error)
 
 def init_database(
+        site_name: str,
         database_type: DataBaseType=DataBaseType.DATABASE, 
+        path: str='', 
         file_name: str='',
         fields: Union[DeclarativeMeta, List[str], None]=None,
-        path: str=os.getcwd(), 
         logger_util: Optional[LoggerUtil]=None
     ) -> Union[DatabaseUtil, JsonUtil, CsvUtil]:
+
+    if not path:
+        path = os.getcwd() + '/data'
+
+    file_path = path + '/' + site_name + "_{:%Y-%m-%d_%H-%M-%S}".format(datetime.now())
+    if file_name:
+        file_path = path + '/' + file_name
+
+    try:
+        if not os.path.exists(path):
+            os.makedirs(path)
+    except:
+        pass
+
     if database_type is DataBaseType.DATABASE and fields and not isinstance(fields, list):
-        database = DatabaseUtil(table=fields, path=path, file_name=file_name, logger_util=logger_util)
+        database = DatabaseUtil(table=fields, file_path=file_path, logger_util=logger_util)
     
     elif database_type is DataBaseType.JSON and not fields:
-        database = JsonUtil(path=path, file_name=file_name, logger_util=logger_util)
+        database = JsonUtil(file_path=file_path, logger_util=logger_util)
     
     elif database_type is DataBaseType.CSV and fields and isinstance(fields, list):
-        database = CsvUtil(path=path, file_name=file_name, field_names=fields, logger_util=logger_util)
+        database = CsvUtil(file_path=file_path, field_names=fields, logger_util=logger_util)
     return database

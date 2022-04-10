@@ -48,6 +48,11 @@ class CrawlerUtil:
             json.dump(previous_retry_info, f, ensure_ascii=False)
         self.retry_info = []
 
+    def reset(self):
+        self.collected_data = []
+        self.retry_info = []
+        self.total_count = 0
+
     def close(self, pool: Pool):
         pool.terminate()
 
