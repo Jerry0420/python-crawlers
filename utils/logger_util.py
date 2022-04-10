@@ -6,6 +6,7 @@ from logging.handlers import RotatingFileHandler
 import inspect
 import multiprocessing
 from multiprocessing.queues import Queue
+import time
 from typing import Optional
 
 class LoggerUtil:
@@ -25,6 +26,7 @@ class LoggerUtil:
         self.logger = LogToQueue(logger_queue=logger_queue)
 
     def close(self):
+        time.sleep(3)
         self.logger_process.join(timeout=5)
         self.logger_process.terminate()
 

@@ -2,9 +2,8 @@ from collections import namedtuple
 from enum import Enum
 import json
 import os
-import time
 
-from utils.logger_util import LoggerUtil
+from utils.logger_util import LogToQueue, LoggerUtil
 from .database_utils import DatabaseUtil, JsonUtil, CsvUtil
 from typing import Optional, Union, List, Dict, Any, Tuple, Iterator, Callable
 from multiprocessing.pool import Pool
@@ -19,14 +18,13 @@ Info = namedtuple('Info', ['current_info', 'next_info', 'retry_info'])
 class CrawlerUtil:
 
     database: Union[DatabaseUtil, JsonUtil, CsvUtil, None] = None
-    logger_util: Optional[LoggerUtil] = None
     
-    def __init__(self, database: Union[DatabaseUtil, JsonUtil, CsvUtil], logger_util: LoggerUtil) -> None:
+    def __init__(self, database: Union[DatabaseUtil, JsonUtil, CsvUtil], logger_util: Optional[LoggerUtil]) -> None:
         self.collected_data = []
         self.retry_info = []
         self.total_count = 0
         self.__class__.database = database
-        self.__class__.logger_util = logger_util
+        self.logger_util = logger_util
 
     def extend(self, data: List[Dict[str, Any]]):
         self.collected_data.extend(data)
@@ -35,7 +33,7 @@ class CrawlerUtil:
 
     def save(self):
         self.total_count += len(self.collected_data)
-        self.__class__.logger_util.logger.info("Saved %s into database", len(self.collected_data))
+        self.logger_util.logger.info("Saved %s into database", len(self.collected_data))
         self.database.save(self.collected_data)
         self.collected_data = []
 
@@ -50,10 +48,8 @@ class CrawlerUtil:
             json.dump(previous_retry_info, f, ensure_ascii=False)
         self.retry_info = []
 
-    def close(self):
-        if self.__class__.logger_util and self.__class__.logger_util.logger_process:
-            time.sleep(3)
-            self.__class__.logger_util.close()
+    def close(self, pool: Pool):
+        pool.terminate()
 
     def imap(self, pool: Pool, function: Callable[[Any], Any], inputs: List[Any]) -> List[Any]:
         all_next_info = []

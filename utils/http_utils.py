@@ -1,12 +1,11 @@
 import aiohttp
 import asyncio
 from enum import Enum
+
+from utils.logger_util import LogToQueue
 from .user_agents import OS, Browser, get_user_agent, UserAgentType
 from .proxies import get_proxy
-import logging
 from typing import Any, Union, List, Dict, Callable, Optional
-
-logger = logging.getLogger(__name__)
 
 class HTTPMethods(Enum):
     GET = "GET"
@@ -41,10 +40,12 @@ class AsyncRequestUtil:
             timeout: int=30, 
             proxy_countries: List[str]=None, 
             user_agent_type: UserAgentType=UserAgentType(OS.MACOS, Browser.CHROME),
-            loop: asyncio.AbstractEventLoop=None
+            loop: asyncio.AbstractEventLoop=None,
+            logger: Optional[LogToQueue]=None
         ):
         
         self.loop = loop
+        self.logger = logger
         self.session = aiohttp.ClientSession(loop=loop)
         self.main_page_url = main_page_url
         self.retry_times = retry_times
@@ -162,7 +163,7 @@ class AsyncRequestUtil:
             if status_code in [200, 204] and response:
                 result = True
         except Exception as error:
-            logger.warning('Retry %s', kwargs['url'])
+            self.logger.warning('Retry %s', kwargs['url'])
         return result
 
     async def __request(
@@ -233,7 +234,7 @@ class AsyncRequestUtil:
             except Exception as error:
                 await self.reset()
         else:
-            logger.warning('Retry and Fail of %s', url)
+            self.logger.warning('Retry and Fail of %s', url)
             response = None
 
         return response

@@ -20,8 +20,8 @@ from utils.helper import split_chunk
 
 site_name = 'yahoo_movie'
 main_page_url = "https://movies.yahoo.com.tw/index.html"
-database = init_database(database_type=DataBaseType.DATABASE, file_name=site_name, fields=YahooMovie)
 logger_util = LoggerUtil(site_name=site_name)
+database = init_database(database_type=DataBaseType.DATABASE, file_name=site_name, fields=YahooMovie, logger=logger_util.logger)
 crawler_util = CrawlerUtil(database=database, logger_util=logger_util)
 
 def get_page(logger: LogToQueue, document: bytes):
@@ -113,7 +113,7 @@ def request_page(logger: LogToQueue, inputs_chunk: List[str]) -> Tuple[List[Dict
     info_of_urls = []
     try:
         loop = asyncio.new_event_loop()
-        session = AsyncRequestUtil(main_page_url=main_page_url, loop=loop)
+        session = AsyncRequestUtil(main_page_url=main_page_url, loop=loop, logger=logger)
         for url in inputs_chunk:
             dom = loop.run_until_complete(session.get(url, allow_redirects=False, retry_function=retry_function))
             data_per_url, info = get_page(logger, dom)
@@ -145,7 +145,9 @@ def start_crawler(process_num, upper_limit, chunk_size):
     finally:
         crawler_util.save()
         logger_util.logger.info('Total saved %s into database.', crawler_util.total_count)
-        crawler_util.close()
+
+        logger_util.close()
+        crawler_util.close(pool=pool)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
