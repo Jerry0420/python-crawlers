@@ -13,7 +13,7 @@ class Parser(Enum):
     HTMLPARSER = 'html.parser'
     HTML5LIB = 'html5lib'
 
-Info = namedtuple('Info', ['current_info', 'next_info', 'retry_info'])
+Info = namedtuple('Info', ['next_info', 'retry_info'])
 
 class CrawlerUtil:
 
