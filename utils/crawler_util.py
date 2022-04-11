@@ -26,6 +26,9 @@ class CrawlerUtil:
         self.__class__.database = database
         self.logger_util = logger_util
 
+    def set_database(self, database: Union[DatabaseUtil, JsonUtil, CsvUtil]):
+        self.__class__.database = database
+
     def extend(self, data: List[Dict[str, Any]]):
         self.collected_data.extend(data)
         if len(self.collected_data) >= 500:
@@ -47,6 +50,11 @@ class CrawlerUtil:
         with open(retry_info_file_path, 'w', encoding='utf-8') as f:
             json.dump(previous_retry_info, f, ensure_ascii=False)
         self.retry_info = []
+
+    def reset(self):
+        self.collected_data = []
+        self.retry_info = []
+        self.total_count = 0
 
     def close(self, pool: Pool):
         pool.terminate()
