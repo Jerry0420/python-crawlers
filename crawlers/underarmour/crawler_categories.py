@@ -25,15 +25,14 @@ def crawl_page(logger: LogToQueue, document: bytes):
     results = []
     if not document:
         return results, None
-
-    print(document)
+    
     return results, None
 
 def request_categories(logger: LogToQueue, url: str):
     data_of_urls = []
     info_of_urls = []
     loop = asyncio.new_event_loop()
-    session = AsyncRequestUtil(main_page_url=main_page_url, loop=loop, logger=logger)
+    session = AsyncRequestUtil(loop=loop, logger=logger)
 
     try:
         document = loop.run_until_complete(session.get(url))
@@ -55,7 +54,7 @@ def start_crawler(process_num):
     try:
         _ = crawler_util.imap(pool, partial(request_categories, logger_util.logger), [main_page_url])
     except Exception as error:
-        pass
+        logger_util.logger.error(error)
     finally:
         crawler_util.save()
         logger_util.logger.info('Total saved %s categories.', crawler_util.total_count)

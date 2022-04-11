@@ -31,6 +31,8 @@ class AsyncRequestUtil:
     
     def __init__(
             self, 
+            loop: asyncio.AbstractEventLoop,
+            logger: Optional[LogToQueue],
             main_page_url: str=None, 
             retry_times: int=5, 
             sleep_seconds: int=30, 
@@ -40,8 +42,6 @@ class AsyncRequestUtil:
             timeout: int=30, 
             proxy_countries: List[str]=None, 
             user_agent_type: UserAgentType=UserAgentType(OS.MACOS, Browser.CHROME),
-            loop: asyncio.AbstractEventLoop=None,
-            logger: Optional[LogToQueue]=None
         ):
         
         self.loop = loop

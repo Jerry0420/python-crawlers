@@ -12,7 +12,7 @@ import traceback
 
 class LoggerUtil:
 
-    def __init__(self, site_name: str='') -> None:
+    def __init__(self, site_name: str) -> None:
         self.site_name = site_name
         self.logger_process: Optional[multiprocessing.Process] = None
         self.logger: Optional[LogToQueue] = None

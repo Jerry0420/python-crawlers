@@ -14,9 +14,9 @@ from sqlalchemy.orm.session import Session
 from utils.logger_util import LoggerUtil
 
 class DataBaseType(Enum):
-    DATABASE = 'DATABASE' # init_database(database_type=DataBaseType.DATABASE, file_name=site_name, fields=GlobalWifi)
-    JSON = 'JSON' #  init_database(database_type=DataBaseType.CSV, file_name=site_name, fields=['title', 'id'])
-    CSV = 'CSV' # init_database(database_type=DataBaseType.JSON, file_name=site_name, fields=None)
+    DATABASE = 'DATABASE' # init_database(database_type=DataBaseType.DATABASE, site_name=site_name, fields=GlobalWifi)
+    JSON = 'JSON' # init_database(database_type=DataBaseType.JSON, site_name=site_name, fields=None)
+    CSV = 'CSV' #  init_database(database_type=DataBaseType.CSV, site_name=site_name, fields=['title', 'id'])
 
 class DatabaseUtil:
     def __init__(self, table: DeclarativeMeta, file_path: str='', logger_util: Optional[LoggerUtil]=None):
@@ -100,11 +100,11 @@ class CsvUtil:
 
 def init_database(
         site_name: str,
-        database_type: DataBaseType=DataBaseType.DATABASE, 
+        database_type: DataBaseType, 
+        logger_util: LoggerUtil,
         path: str='', 
         file_name: str='',
         fields: Union[DeclarativeMeta, List[str], None]=None,
-        logger_util: Optional[LoggerUtil]=None
     ) -> Union[DatabaseUtil, JsonUtil, CsvUtil]:
 
     if not path:
