@@ -7,7 +7,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/../../")
 from bs4 import BeautifulSoup
 import argparse
 import asyncio
-from utils.crawler_util import CrawlerUtil, Info
+from utils.crawler_util import CrawlerUtil, Info, Parser
 from utils.database_utils import init_database, DataBaseType
 from utils.http_utils import AsyncRequestUtil
 from utils.logger_util import LoggerUtil, LogToQueue
@@ -24,8 +24,8 @@ logger_util = LoggerUtil(site_name=site_name)
 database = init_database(database_type=DataBaseType.DATABASE, site_name=site_name, fields=YahooMovie, logger_util=logger_util)
 crawler_util = CrawlerUtil(database=database, logger_util=logger_util)
 
-def get_page(logger: LogToQueue, document: bytes):
-    document = BeautifulSoup(document, 'lxml')
+def crawl_page(logger: LogToQueue, document: bytes):
+    document = BeautifulSoup(document, Parser.LXML.value)
     result = {}
 
     if not document:
@@ -110,20 +110,20 @@ def retry_function(status_code: int, response: Union[Dict[str, Any], bytes, None
 def request_page(logger: LogToQueue, inputs_chunk: List[str]) -> Tuple[List[Dict[str, Any]], List[Info]]:
     data_of_urls = []
     info_of_urls = []
+    loop = asyncio.new_event_loop()
+    session = AsyncRequestUtil(main_page_url=main_page_url, loop=loop, logger=logger)
     try:
-        loop = asyncio.new_event_loop()
-        session = AsyncRequestUtil(main_page_url=main_page_url, loop=loop, logger=logger)
         for url in inputs_chunk:
             dom = loop.run_until_complete(session.get(url, allow_redirects=False, retry_function=retry_function))
-            data_per_url, info = get_page(logger, dom)
+            data_per_url, info = crawl_page(logger, dom)
             if data_per_url:
                 data_of_urls.extend(data_per_url)
             if info:
                 info_of_urls.extend(info)
-        asyncio.run(session.close())
     except Exception as error:
         logger.error(error)
     finally:
+        asyncio.run(session.close())
         return data_of_urls, info_of_urls
 
 def start_crawler(process_num, upper_limit, chunk_size):

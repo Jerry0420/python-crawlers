@@ -26,6 +26,9 @@ class CrawlerUtil:
         self.__class__.database = database
         self.logger_util = logger_util
 
+    def set_database(self, database: Union[DatabaseUtil, JsonUtil, CsvUtil]):
+        self.__class__.database = database
+
     def extend(self, data: List[Dict[str, Any]]):
         self.collected_data.extend(data)
         if len(self.collected_data) >= 500:
