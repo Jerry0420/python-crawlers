@@ -5,7 +5,7 @@
 - [Table Of Contents](#table-of-contents)
 - [Overview](#overview)
 - [Key Features](#key-features)
-- [Tools & Concepts](#tools--concepts)
+- [Utilities & Concepts](#utilities--concepts)
     - [HTTP Utility](#http-utility)
     - [Database Utility](#database-utility)
     - [Logging Utility](#logging-utility)
@@ -37,7 +37,7 @@ Please note the following two points:
 1. The number of processes must coordinate with the number of computer cores. More processes don't mean a faster performance of the program. If there are too many processes running inside one program, it will cause more context switches between processes and lower the speed of that program.
 2. Consider the network speed, don't assign too many tasks inside one process at a time. Because of asynchronous execution, one process can perform multiple HTTP requests simultaneously and multiple processes are running inside a web crawler. Therefore, it will make many HTTP requests wait together and lead to timeout problems.
 
-# Tools & Concepts
+# Utilities & Concepts
 ### [HTTP Utility](https://github.com/Jerry0420/python-crawlers/blob/main/utils/http_utils.py) 
 * Developed by the Python [AIOHTTP](https://github.com/aio-libs/aiohttp) module.
 * The following points are the main reasons that cause networking tasks to fail when web crawling:
