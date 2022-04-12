@@ -4,19 +4,32 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/../../")
 
 from bs4 import BeautifulSoup
 import asyncio
-from utils.crawler_util import CrawlerUtil, Info, Parser
+from utils.crawler_util import CrawlerUtil, Parser
 from utils.database_utils import init_database, DataBaseType
 from utils.http_utils import AsyncRequestUtil
 from utils.logger_util import LoggerUtil, LogToQueue
-from multiprocessing import Pool
-import re
-from functools import partial
 
 site_name = 'underarmour'
 main_page_url = "https://www.underarmour.tw"
 logger_util = LoggerUtil(site_name=site_name)
 database = init_database(database_type=DataBaseType.JSON, logger_util=logger_util, site_name=site_name, path=os.getcwd(), file_name='categories')
 crawler_util = CrawlerUtil(database=database, logger_util=logger_util)
+
+def crawl_category_info(logger: LogToQueue, document: bytes, url: str= ''):
+    document: BeautifulSoup = BeautifulSoup(document, Parser.LXML.value)
+    total = 0
+    nav = ''
+    try:
+        total_number_blocks = document.select_one('.list-header-num span')
+        total = int(total_number_blocks.get_text())
+
+        nav_block = document.select_one('#nav')
+        nav = nav_block['value']
+
+    except Exception as error:
+        logger.error("Error occurred %s.", url)
+        return []
+    return total, nav
 
 def crawl_page(logger: LogToQueue, document: bytes):
     document: BeautifulSoup = BeautifulSoup(document, Parser.LXML.value)
@@ -46,18 +59,23 @@ def crawl_page(logger: LogToQueue, document: bytes):
     return results
 
 def request_categories(logger: LogToQueue, url: str):
-    data_of_urls = []
+    categories = []
     loop = asyncio.get_event_loop()
     session = AsyncRequestUtil(loop=loop, logger=logger)
 
     try:
         document = loop.run_until_complete(session.get(url))
         data_of_urls = crawl_page(logger, document)
+        for url in data_of_urls:
+            document = loop.run_until_complete(session.get(url))
+            total, nav = crawl_category_info(logger, document, url)
+            category = {'url': url, 'total': total, 'nav': nav}
+            categories.append(category)
     except Exception as error:
         logger_util.logger.error(error)
     finally:
         asyncio.run(session.close())
-        return data_of_urls
+        return categories
 
 def start_crawler():
     logger_util.init_logger_process_and_logger()
