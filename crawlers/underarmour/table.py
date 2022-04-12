@@ -7,6 +7,5 @@ class Underarmour(Base):
     id = Column(Integer, primary_key=True)
     title = Column(String)
     url = Column(String)
-    image = Column(String)
     prod_id = Column(String)
     price = Column(Integer)
