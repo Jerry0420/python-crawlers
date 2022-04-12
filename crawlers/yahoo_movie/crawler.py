@@ -7,7 +7,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/../../")
 from bs4 import BeautifulSoup
 import argparse
 import asyncio
-from utils.crawler_util import CrawlerUtil, Info, Parser
+from utils.crawler_util import CrawlerUtil, Info, Parser, CrawlerConfig
 from utils.database_utils import init_database, DataBaseType
 from utils.http_utils import AsyncRequestUtil
 from utils.logger_util import LoggerUtil, LogToQueue
@@ -20,9 +20,6 @@ from utils.helper import split_chunk
 
 site_name = 'yahoo_movie'
 main_page_url = "https://movies.yahoo.com.tw/index.html"
-logger_util = LoggerUtil(site_name=site_name)
-database = init_database(database_type=DataBaseType.DATABASE, site_name=site_name, fields=YahooMovie, logger_util=logger_util)
-crawler_util = CrawlerUtil(database=database, logger_util=logger_util)
 
 def crawl_page(logger: LogToQueue, document: bytes):
     document = BeautifulSoup(document, Parser.LXML.value)
@@ -126,14 +123,17 @@ def request_page(logger: LogToQueue, inputs_chunk: List[str]) -> Tuple[List[Dict
         asyncio.run(session.close())
         return data_of_urls, info_of_urls
 
-def start_crawler(process_num, upper_limit, chunk_size):
+def start_crawler(crawler_config: CrawlerConfig, upper_limit):
+    logger_util = crawler_config.logger_util
+    crawler_util =crawler_config.crawler_util
+
     # must init all processes inside main function.
-    pool = Pool(processes=process_num)
+    pool = Pool(processes=crawler_config.process_num)
     logger_util.init_logger_process_and_logger()
 
     inputs_chunks = split_chunk(
         [f"https://movies.yahoo.com.tw/movieinfo_main.html/id={i}" for i in range(1, upper_limit)], 
-        chunk_size
+        crawler_config.chunk_size
     )
     try:
         _ = crawler_util.imap(pool, partial(request_page, logger_util.logger), inputs_chunks)
@@ -152,4 +152,9 @@ if __name__ == "__main__":
     parser.add_argument("-c", "--chunk_size", help="size of tasks inside one process.", type=int, default=20)
     parser.add_argument("-u", "--upper_limit", help="upper limit of this website.", type=int, default=12900)
     args = parser.parse_args()
-    start_crawler(args.processes, args.upper_limit, args.chunk_size)
+
+    logger_util = LoggerUtil(site_name=site_name)
+    database = init_database(database_type=DataBaseType.DATABASE, site_name=site_name, fields=YahooMovie, logger_util=logger_util)
+    crawler_util = CrawlerUtil(database=database, logger_util=logger_util)
+    crawler_config = CrawlerConfig(crawler_util=crawler_util, logger_util=logger_util, process_num=args.processes, chunk_size=args.chunk_size)
+    start_crawler(crawler_config, args.upper_limit)
