@@ -4,16 +4,13 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/../../")
 
 from bs4 import BeautifulSoup
 import asyncio
-from utils.crawler_util import CrawlerUtil, Parser
+from utils.crawler_util import CrawlerUtil, Parser, CrawlerConfig
 from utils.database_utils import init_database, DataBaseType
 from utils.http_utils import AsyncRequestUtil
 from utils.logger_util import LoggerUtil, LogToQueue
 
 site_name = 'underarmour'
 main_page_url = "https://www.underarmour.tw"
-logger_util = LoggerUtil(site_name=site_name)
-database = init_database(database_type=DataBaseType.JSON, logger_util=logger_util, site_name=site_name, path=os.getcwd(), file_name='categories')
-crawler_util = CrawlerUtil(database=database, logger_util=logger_util)
 
 def crawl_category_info(logger: LogToQueue, document: bytes, url: str= ''):
     document: BeautifulSoup = BeautifulSoup(document, Parser.LXML.value)
@@ -72,12 +69,15 @@ def request_categories(logger: LogToQueue, url: str):
             category = {'url': url, 'total': total, 'nav': nav}
             categories.append(category)
     except Exception as error:
-        logger_util.logger.error(error)
+        logger.error(error)
     finally:
         asyncio.run(session.close())
         return categories
 
-def start_crawler():
+def start_crawler(crawler_config: CrawlerConfig):
+    logger_util = crawler_config.logger_util
+    crawler_util = crawler_config.crawler_util
+
     logger_util.init_logger_process_and_logger()
 
     try:
@@ -91,4 +91,9 @@ def start_crawler():
         logger_util.close()
 
 if __name__ == "__main__":
-    start_crawler()
+    logger_util = LoggerUtil(site_name=site_name)
+    database = init_database(database_type=DataBaseType.JSON, logger_util=logger_util, site_name=site_name, path=os.getcwd(), file_name='categories')
+    crawler_util = CrawlerUtil(database=database, logger_util=logger_util)
+
+    crawler_config = CrawlerConfig(crawler_util=crawler_util, logger_util=logger_util)
+    start_crawler(crawler_config)

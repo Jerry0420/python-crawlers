@@ -6,7 +6,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/../../")
 from bs4 import BeautifulSoup
 import argparse
 import asyncio
-from utils.crawler_util import CrawlerUtil, Info, Parser
+from utils.crawler_util import CrawlerUtil, Info, Parser, CrawlerConfig
 from utils.database_utils import init_database, DataBaseType
 from utils.http_utils import AsyncRequestUtil
 from utils.logger_util import LoggerUtil, LogToQueue
@@ -19,9 +19,6 @@ import math
 
 site_name = 'underarmour'
 main_page_url = "https://www.underarmour.tw"
-logger_util = LoggerUtil(site_name=site_name)
-database = init_database(database_type=DataBaseType.DATABASE, site_name=site_name, fields=Underarmour, logger_util=logger_util)
-crawler_util = CrawlerUtil(database=database, logger_util=logger_util)
 
 def crawl_page(logger: LogToQueue, document: bytes, url: str, category_url: str):
     document: BeautifulSoup = BeautifulSoup(document, Parser.LXML.value)
@@ -70,9 +67,11 @@ def request_page(logger: LogToQueue, inputs_chunk: List[str]) -> Tuple[List[Dict
         asyncio.run(session.close())
         return data_of_urls, info_of_urls
 
-def start_crawler(process_num, chunk_size):
-    # must init all processes inside main function.
-    pool = Pool(processes=process_num)
+def start_crawler(crawler_config: CrawlerConfig):
+    logger_util = crawler_config.logger_util
+    crawler_util =crawler_config.crawler_util
+
+    pool = Pool(processes=crawler_config.process_num)
     logger_util.init_logger_process_and_logger()
 
     total_urls = []
@@ -83,12 +82,12 @@ def start_crawler(process_num, chunk_size):
     for category in categories:
         nav = category['nav']
         category_url = category['url']
-        total_page = math.ceil(category['total'] / 40) # 40 items in a page.
+        total_page = math.ceil(category['total'] / 40) # 40 items in one page.
         for page in range(1, total_page + 1):
             url = f'{main_page_url}/sys/navigation/loading?nav={nav}&pageNumber={page}'
             total_urls.append({"url": url, "category_url": category_url})
 
-    inputs_chunks = split_chunk(total_urls, chunk_size)
+    inputs_chunks = split_chunk(total_urls, crawler_config.chunk_size)
     
     try:
         _ = crawler_util.imap(pool, partial(request_page, logger_util.logger), inputs_chunks)
@@ -106,4 +105,10 @@ if __name__ == "__main__":
     parser.add_argument("-p", "--processes", help="crawl with n processes", type=int, default=5)
     parser.add_argument("-c", "--chunk_size", help="size of tasks inside one process.", type=int, default=20)
     args = parser.parse_args()
-    start_crawler(args.processes, args.chunk_size)
+
+    logger_util = LoggerUtil(site_name=site_name)
+    database = init_database(database_type=DataBaseType.DATABASE, site_name=site_name, fields=Underarmour, logger_util=logger_util)
+    crawler_util = CrawlerUtil(database=database, logger_util=logger_util)
+
+    crawler_config = CrawlerConfig(crawler_util=crawler_util, logger_util=logger_util, process_num=args.processes, chunk_size=args.chunk_size)    
+    start_crawler(crawler_config)

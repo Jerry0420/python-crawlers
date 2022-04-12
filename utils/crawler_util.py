@@ -81,3 +81,10 @@ class CrawlerUtil:
         if self.retry_info:
             self.save_retry_info()
         return all_next_info
+
+class CrawlerConfig:
+    def __init__(self, crawler_util: Optional[CrawlerUtil]=None, logger_util: Optional[LoggerUtil]=None, process_num: Optional[int]=None, chunk_size: Optional[int]=None) -> None:
+        self.crawler_util = crawler_util
+        self.logger_util = logger_util
+        self.process_num = process_num
+        self.chunk_size = chunk_size
