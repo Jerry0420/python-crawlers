@@ -1,7 +1,5 @@
 import os
 import sys
-import traceback
-from typing import Any, Dict, List, Tuple, Union
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/../../")
 
 from bs4 import BeautifulSoup
@@ -21,11 +19,30 @@ database = init_database(database_type=DataBaseType.JSON, logger_util=logger_uti
 crawler_util = CrawlerUtil(database=database, logger_util=logger_util)
 
 def crawl_page(logger: LogToQueue, document: bytes):
-    document = BeautifulSoup(document, Parser.LXML.value)
+    document: BeautifulSoup = BeautifulSoup(document, Parser.LXML.value)
     results = []
     if not document:
         return results, None
     
+    try:
+        men_blocks = document.select_one('.nav-li-men')
+        women_blocks = document.select_one('.nav-li-women')
+        junior_blocks = document.select_one('.nav-li-junior')
+        
+        men_blocks.append(women_blocks)
+        men_blocks.append(junior_blocks)
+
+        men_women_junior_blocks = men_blocks
+
+        urls = men_women_junior_blocks.select('.menu-li-common > a:first-of-type')
+        for url in urls:
+            url = url.get('href')
+            if 'cmens-' in url or 'cwomens-' in url or 'cyouth_' in url:
+                url = main_page_url + url
+                results.append(url)
+    except Exception as error:
+        logger.error("Error occurred.")
+        return [], None
     return results, None
 
 def request_categories(logger: LogToQueue, url: str):
