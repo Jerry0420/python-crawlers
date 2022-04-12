@@ -22,7 +22,7 @@ def crawl_page(logger: LogToQueue, document: bytes):
     document: BeautifulSoup = BeautifulSoup(document, Parser.LXML.value)
     results = []
     if not document:
-        return results, None
+        return []
     
     try:
         men_blocks = document.select_one('.nav-li-men')
@@ -42,41 +42,35 @@ def crawl_page(logger: LogToQueue, document: bytes):
                 results.append(url)
     except Exception as error:
         logger.error("Error occurred.")
-        return [], None
-    return results, None
+        return []
+    return results
 
 def request_categories(logger: LogToQueue, url: str):
     data_of_urls = []
-    info_of_urls = []
-    loop = asyncio.new_event_loop()
+    loop = asyncio.get_event_loop()
     session = AsyncRequestUtil(loop=loop, logger=logger)
 
     try:
         document = loop.run_until_complete(session.get(url))
-        data_per_url, info = crawl_page(logger, document)
-        if data_per_url:
-            data_of_urls.extend(data_per_url)
-        if info:
-            info_of_urls.extend(info)
+        data_of_urls = crawl_page(logger, document)
     except Exception as error:
         logger_util.logger.error(error)
     finally:
         asyncio.run(session.close())
-        return data_of_urls, info_of_urls
+        return data_of_urls
 
-def start_crawler(process_num):
-    pool = Pool(processes=process_num)
+def start_crawler():
     logger_util.init_logger_process_and_logger()
 
     try:
-        _ = crawler_util.imap(pool, partial(request_categories, logger_util.logger), [main_page_url])
+        data_of_urls = request_categories(logger_util.logger, main_page_url)
+        crawler_util.extend(data_of_urls)
     except Exception as error:
         logger_util.logger.error(error)
     finally:
         crawler_util.save()
         logger_util.logger.info('Total saved %s categories.', crawler_util.total_count)
         logger_util.close()
-        crawler_util.close(pool=pool)
 
 if __name__ == "__main__":
-    start_crawler(1)
+    start_crawler()
