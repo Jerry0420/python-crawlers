@@ -21,12 +21,11 @@ site_name = 'underarmour'
 main_page_url = "https://www.underarmour.tw"
 
 def crawl_page(logger: LogToQueue, document: bytes, url: str, category_url: str):
-    document: BeautifulSoup = BeautifulSoup(document, Parser.LXML.value)
-
     results = []
-
     if not document:
         return results, None
+    
+    document: BeautifulSoup = BeautifulSoup(document, Parser.LXML.value)
 
     try:
         items_blocks = document.select('.list-item')
@@ -49,13 +48,15 @@ def crawl_page(logger: LogToQueue, document: bytes, url: str, category_url: str)
 def request_page(logger: LogToQueue, inputs_chunk: List[str]) -> Tuple[List[Dict[str, Any]], List[Info]]:
     data_of_urls = []
     info_of_urls = []
-    loop = asyncio.new_event_loop()
+    loop = asyncio.get_event_loop()
     session = AsyncRequestUtil(main_page_url=main_page_url, loop=loop, logger=logger)
     try:
-        for task in inputs_chunk:
-            url = task['url']
-            category_url = task['category_url']
-            dom = loop.run_until_complete(session.get(url))
+        coroutines = [session.get(param['url'], with_return=param) for param in inputs_chunk]
+        coroutines_iterator = asyncio.as_completed(coroutines)
+        for coroutine in coroutines_iterator:
+            dom, param = loop.run_until_complete(coroutine)
+            url = param['url']
+            category_url = param['category_url']
             data_per_url, info = crawl_page(logger, dom, url, category_url)
             if data_per_url:
                 data_of_urls.extend(data_per_url)
