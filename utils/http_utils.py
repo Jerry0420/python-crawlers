@@ -5,7 +5,7 @@ from enum import Enum
 from utils.logger_util import LogToQueue
 from .user_agents import OS, Browser, get_user_agent, UserAgentType
 from .proxies import get_proxy
-from typing import Any, Union, List, Dict, Callable, Optional
+from typing import Any, Union, List, Dict, Callable, Optional, Tuple
 
 class HTTPMethods(Enum):
     GET = "GET"
@@ -112,8 +112,9 @@ class AsyncRequestUtil:
             referer: Optional[str]=None, 
             allow_redirects: bool=True, 
             json_response: bool=False, 
-            retry_function: Optional[Callable[[Any], bool]]=None
-        ) -> Union[None, Dict[str, Any], bytes]:
+            retry_function: Optional[Callable[[Any], bool]]=None,
+            with_return: Any=None
+        ) -> Union[Union[None, Dict[str, Any], bytes], Tuple[Union[None, Dict[str, Any], bytes], Any]]:
         response = await self.__request(
                 self.session.get, 
                 url, 
@@ -125,7 +126,8 @@ class AsyncRequestUtil:
                 referer=referer, 
                 allow_redirects=allow_redirects, 
                 json_response=json_response, 
-                retry_function=retry_function
+                retry_function=retry_function,
+                with_return=with_return
             )
         return response
 
@@ -140,8 +142,9 @@ class AsyncRequestUtil:
             referer: Optional[str]=None, 
             allow_redirects: bool=True, 
             json_response: bool=False,
-            retry_function: Optional[Callable[[Any], bool]]=None
-        ) -> Union[None, Dict[str, Any], bytes]:
+            retry_function: Optional[Callable[[Any], bool]]=None,
+            with_return: Any=None
+        ) -> Union[Union[None, Dict[str, Any], bytes], Tuple[Union[None, Dict[str, Any], bytes], Any]]:
         response = await self.__request(
                 self.session.post, 
                 url, 
@@ -153,7 +156,8 @@ class AsyncRequestUtil:
                 referer=referer, 
                 allow_redirects=allow_redirects, 
                 json_response=json_response, 
-                retry_function=retry_function
+                retry_function=retry_function,
+                with_return=with_return
             )
         return response
 
@@ -178,8 +182,9 @@ class AsyncRequestUtil:
             referer: Optional[str]=None, 
             allow_redirects: bool=True, 
             json_response: bool=False,
-            retry_function: Optional[Callable[[Any], bool]]=None
-        ) -> Union[None, Dict[str, Any], bytes]:
+            retry_function: Optional[Callable[[Any], bool]]=None,
+            with_return: Any=None
+        ) -> Union[Union[None, Dict[str, Any], bytes], Tuple[Union[None, Dict[str, Any], bytes], Any]]:
 
         if referer:
             self.headers['referer'] = referer
@@ -236,5 +241,7 @@ class AsyncRequestUtil:
         else:
             self.logger.warning('Retry and Fail of %s', url)
             response = None
-
-        return response
+        if with_return:
+            return response, with_return
+        else:
+            return response
