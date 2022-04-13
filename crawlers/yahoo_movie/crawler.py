@@ -22,11 +22,11 @@ site_name = 'yahoo_movie'
 main_page_url = "https://movies.yahoo.com.tw/index.html"
 
 def crawl_page(logger: LogToQueue, document: bytes):
-    document = BeautifulSoup(document, Parser.LXML.value)
     result = {}
-
     if not document:
         return [], None
+
+    document = BeautifulSoup(document, Parser.LXML.value)
     
     url_block = document.select_one('meta[property="og:url"]')
     if not url_block or url_block and  '/id=' not in url_block['content']: 
@@ -100,18 +100,20 @@ def retry_function(status_code: int, response: Union[Dict[str, Any], bytes, None
     result = False
     if status_code in [200, 204] and response:
         result = True
-    if status_code == 302:
+    if status_code in [302, 500]:
         result = True
     return result
 
 def request_page(logger: LogToQueue, inputs_chunk: List[str]) -> Tuple[List[Dict[str, Any]], List[Info]]:
     data_of_urls = []
     info_of_urls = []
-    loop = asyncio.new_event_loop()
+    loop = asyncio.get_event_loop()
     session = AsyncRequestUtil(main_page_url=main_page_url, loop=loop, logger=logger)
     try:
-        for url in inputs_chunk:
-            dom = loop.run_until_complete(session.get(url, allow_redirects=False, retry_function=retry_function))
+        coroutines = [session.get(url, allow_redirects=False, retry_function=retry_function) for url in inputs_chunk]
+        coroutines_iterator = asyncio.as_completed(coroutines)
+        for coroutine in coroutines_iterator:
+            dom = loop.run_until_complete(coroutine)
             data_per_url, info = crawl_page(logger, dom)
             if data_per_url:
                 data_of_urls.extend(data_per_url)
