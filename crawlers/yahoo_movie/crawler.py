@@ -107,7 +107,8 @@ def retry_function(status_code: int, response: Union[Dict[str, Any], bytes, None
 def request_page(logger: LogToQueue, inputs_chunk: List[str]) -> Tuple[List[Dict[str, Any]], List[Info]]:
     data_of_urls = []
     info_of_urls = []
-    loop = asyncio.get_event_loop()
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     session = AsyncRequestUtil(main_page_url=main_page_url, loop=loop, logger=logger)
     try:
         coroutines = [session.get(url, allow_redirects=False, retry_function=retry_function) for url in inputs_chunk]
@@ -152,7 +153,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-p", "--processes", help="crawl with n processes", type=int, default=5)
     parser.add_argument("-c", "--chunk_size", help="size of tasks inside one process.", type=int, default=20)
-    parser.add_argument("-u", "--upper_limit", help="upper limit of this website.", type=int, default=12900)
+    parser.add_argument("-u", "--upper_limit", help="upper limit of this website.", type=int, default=300) # 12900
     args = parser.parse_args()
 
     logger_util = LoggerUtil(site_name=site_name)
