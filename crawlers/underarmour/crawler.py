@@ -48,7 +48,8 @@ def crawl_page(logger: LogToQueue, document: bytes, url: str, category_url: str)
 def request_page(logger: LogToQueue, inputs_chunk: List[str]) -> Tuple[List[Dict[str, Any]], List[Info]]:
     data_of_urls = []
     info_of_urls = []
-    loop = asyncio.get_event_loop()
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     session = AsyncRequestUtil(main_page_url=main_page_url, loop=loop, logger=logger)
     try:
         coroutines = [session.get(param['url'], with_return=param) for param in inputs_chunk]
