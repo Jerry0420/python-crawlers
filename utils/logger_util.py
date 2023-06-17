@@ -28,8 +28,11 @@ class MultiProcesses_Logger_Util:
     
     def redirect_main_process_log_to_queue(self):
 
+        main_process_id = os.getpid()
+
         def filter(record: logging.LogRecord):
-            self.queue.put_nowait(record)
+            if record.process == main_process_id:
+                self.queue.put_nowait(record)
             return None
 
         root = logging.getLogger()
