@@ -1,18 +1,20 @@
+import logging
 import os
 import sys
+
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/../../")
 
 from bs4 import BeautifulSoup
 import asyncio
+from utils.logger_util import MultiProcesses_Logger_Util
 from utils.crawler_util import CrawlerUtil, Parser, CrawlerConfig
 from utils.database_utils import init_database, DataBaseType
 from utils.http_utils import AsyncRequestUtil
-from utils.logger_util import LoggerUtil, LogToQueue
 
 site_name = 'underarmour'
 main_page_url = "https://www.underarmour.tw"
 
-def crawl_category_info(logger: LogToQueue, document: bytes, url: str= ''):
+def crawl_category_info(logger: logging.Logger, document: bytes, url: str= ''):
     document: BeautifulSoup = BeautifulSoup(document, Parser.LXML.value)
     total = 0
     nav = ''
@@ -28,7 +30,7 @@ def crawl_category_info(logger: LogToQueue, document: bytes, url: str= ''):
         return []
     return total, nav
 
-def crawl_page(logger: LogToQueue, document: bytes):
+def crawl_page(logger: logging.Logger, document: bytes):
     document: BeautifulSoup = BeautifulSoup(document, Parser.LXML.value)
     results = []
     if not document:
@@ -55,7 +57,7 @@ def crawl_page(logger: LogToQueue, document: bytes):
         return []
     return results
 
-def request_categories(logger: LogToQueue, url: str):
+def request_categories(logger: logging.Logger, url: str):
     categories = []
     loop = asyncio.get_event_loop()
     session = AsyncRequestUtil(loop=loop, logger=logger)
@@ -75,25 +77,23 @@ def request_categories(logger: LogToQueue, url: str):
         return categories
 
 def start_crawler(crawler_config: CrawlerConfig):
-    logger_util = crawler_config.logger_util
     crawler_util = crawler_config.crawler_util
-
-    logger_util.init_logger_process_and_logger()
+    main_logger = logging.getLogger('main')
 
     try:
-        data_of_urls = request_categories(logger_util.logger, main_page_url)
+        data_of_urls = request_categories(main_logger, main_page_url)
         crawler_util.extend(data_of_urls)
     except Exception as error:
-        logger_util.logger.error(error)
+        main_logger.error(error)
     finally:
         crawler_util.save()
-        logger_util.logger.info('Total saved %s categories.', crawler_util.total_count)
+        main_logger.info('Total saved %s categories.', crawler_util.total_count)
         logger_util.close()
 
 if __name__ == "__main__":
-    logger_util = LoggerUtil(site_name=site_name)
-    database = init_database(database_type=DataBaseType.JSON, logger_util=logger_util, site_name=site_name, path=os.getcwd(), file_name='categories')
-    crawler_util = CrawlerUtil(database=database, logger_util=logger_util)
+    logger_util = MultiProcesses_Logger_Util(site_name)
+    database = init_database(database_type=DataBaseType.JSON, site_name=site_name, path=os.getcwd(), file_name='categories')
+    crawler_util = CrawlerUtil(database=database)
 
-    crawler_config = CrawlerConfig(crawler_util=crawler_util, logger_util=logger_util)
+    crawler_config = CrawlerConfig(crawler_util=crawler_util, logger_queue=logger_util.queue)
     start_crawler(crawler_config)

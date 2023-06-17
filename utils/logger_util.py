@@ -1,107 +1,81 @@
 import logging
-from optparse import Option
-import os
-from datetime import datetime
-from logging.handlers import RotatingFileHandler
-import inspect
+import logging.handlers
 import multiprocessing
-from multiprocessing.queues import Queue
-import time
-from typing import Optional
-import traceback
+import os
+import sys
 
-class LoggerUtil:
+from pathlib import Path
 
-    def __init__(self, site_name: str) -> None:
-        self.site_name = site_name
-        self.logger_process: Optional[multiprocessing.Process] = None
-        self.logger: Optional[LogToQueue] = None
 
-    def init_logger_process_and_logger(self):
-        manager = multiprocessing.Manager()
-        logger_queue = manager.Queue()
-        logger_process = multiprocessing.Process(target=init_logger_process, args=(self.site_name, logger_queue,))
-        logger_process.start()
+class MultiProcesses_Logger_Util:
 
-        self.logger_process = logger_process
-        self.logger = LogToQueue(logger_queue=logger_queue)
+    def __init__(self, file_name: str) -> None:
+        self.queue = multiprocessing.Manager().Queue(-1)
+        self.file_name = file_name
+        
+        self.process = multiprocessing.get_context('fork').Process(
+            target=self._process_target,
+        )
+        self.process.start()
+
+        self.redirect_main_process_log_to_queue()
+
+    def get_log_file_path(self) -> str:
+        log_file_dir = os.path.join(Path(__file__).parent, '..', 'logs')
+        Path(log_file_dir).mkdir(parents=True, exist_ok=True)
+        log_file_path = os.path.join(log_file_dir, f'{self.file_name}.log')
+        return log_file_path
+    
+    def redirect_main_process_log_to_queue(self):
+
+        def filter(record: logging.LogRecord):
+            self.queue.put_nowait(record)
+            return None
+
+        root = logging.getLogger()
+        root.setLevel(logging.INFO)
+
+        handler = logging.Handler()
+        handler.addFilter(filter)
+        root.addHandler(handler)
+    
+    def init_logger_configure(self):
+        root = logging.getLogger()
+        root.setLevel(logging.INFO)
+
+        file_handler = logging.handlers.RotatingFileHandler(
+            self.get_log_file_path(),
+            mode='w',
+            # maxBytes=5000,
+            # backupCount=0,
+            encoding='utf-8',
+        )
+        file_handler.setLevel(logging.INFO)
+        file_handler_formatter = logging.Formatter(
+            fmt='%(asctime)s | %(name)s | %(levelname)s | %(filename)s:%(lineno)d | %(process)d | %(message)s',
+            datefmt="%m-%d %H:%M:%S"
+        )
+        file_handler.setFormatter(file_handler_formatter)
+        root.addHandler(file_handler)
+
+        std_handler = logging.StreamHandler(sys.stdout)
+        std_handler.setLevel(logging.DEBUG)
+        std_handler_formatter = logging.Formatter(
+            fmt='%(asctime)s | %(name)s | %(levelname)s | %(filename)s:%(lineno)d | %(process)d | %(message)s',
+            datefmt="%m-%d %H:%M:%S"
+        )
+        std_handler.setFormatter(std_handler_formatter)
+        root.addHandler(std_handler)
+
+    def _process_target(self):
+        self.init_logger_configure()
+        while True:
+            record: logging.LogRecord = self.queue.get()
+            if record is None:
+                break
+            logger = logging.getLogger(record.name)
+            logger.handle(record)
 
     def close(self):
-        time.sleep(3)
-        self.logger_process.join(timeout=5)
-        self.logger_process.terminate()
-
-class LogToQueue:
-    def __init__(self, logger_queue: Optional[Queue]) -> None:
-        self.logger_queue = logger_queue
-    
-    def info(self, message, *args, **kwargs):
-        current_stack = inspect.stack()[1]
-        self.logger_queue.put([logging.INFO, os.getpid(), current_stack[1], current_stack[2], message, args, kwargs])
-        
-    def error(self, message, *args, **kwargs):
-        traceback.print_exc()
-        current_stack = inspect.stack()[1]
-        self.logger_queue.put([logging.ERROR, os.getpid(), current_stack[1], current_stack[2], message, args, kwargs])
-        
-    def warning(self, message, *args, **kwargs):
-        current_stack = inspect.stack()[1]
-        self.logger_queue.put([logging.WARNING, os.getpid(), current_stack[1], current_stack[2], message, args, kwargs])
-        
-    def critical(self, message, *args, **kwargs):
-        current_stack = inspect.stack()[1]
-        self.logger_queue.put([logging.CRITICAL, os.getpid(), current_stack[1], current_stack[2], message, args, kwargs])
-
-def init_log(path: str=os.getcwd(), site_name: str='') -> logging.Logger:
-    logging.captureWarnings(True)
-    
-    logger = logging.getLogger(site_name)
-    logger.setLevel(logging.INFO)
-
-    formatter = logging.Formatter('%(levelname)s | %(asctime)s | %(message)s', "%Y-%m-%d %H:%M:%S")
-
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.DEBUG)
-    console_handler.setFormatter(formatter)
-
-    if not os.path.exists(path + '/logs'):
-        os.makedirs(path + '/logs')
-    
-    str_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    logger_file_path = path + '/logs/' + site_name + "_{}".format(str_time) + ".log"
-
-    file_handler = RotatingFileHandler(logger_file_path, mode='a', maxBytes=1024*1024, backupCount=1, encoding='utf-8', delay=0)
-
-    file_handler.setFormatter(formatter)
-    
-    logger.addHandler(console_handler)
-    logger.addHandler(file_handler)
-    return logger
-
-def init_logger_process(site_name: str, logger_queue: Queue):
-    logger = init_log(site_name=site_name)
-    while True:
-        while not logger_queue.empty():
-            message_info = logger_queue.get()
-            log_type = message_info[0]
-            log_pid = message_info[1]
-
-            log_filename = message_info[2]
-            log_linenum = message_info[3]
-            
-            log_message = message_info[4]
-            log_args = message_info[5]
-            log_kargs = message_info[6]
-
-            before_message = f'{log_pid} | {log_filename}:{log_linenum} | '
-            
-            log_func = None
-            if log_type == logging.INFO:
-                log_func = logger.info
-            if log_type == logging.ERROR:
-                log_func = logger.error
-            if log_type == logging.WARNING:
-                log_func = logger.warning
-            if log_type == logging.CRITICAL:
-                log_func = logger.critical
-            log_func(f'{before_message}{log_message}', *log_args, **log_kargs)
+        self.process.join(timeout=0)
+        self.process.terminate()

@@ -1,8 +1,8 @@
+import logging
 import aiohttp
 import asyncio
 from enum import Enum
 
-from utils.logger_util import LogToQueue
 from .user_agents import OS, Browser, get_user_agent, UserAgentType
 from .proxies import get_proxy
 from typing import Any, Union, List, Dict, Callable, Optional, Tuple
@@ -32,7 +32,7 @@ class AsyncRequestUtil:
     def __init__(
             self, 
             loop: asyncio.AbstractEventLoop,
-            logger: Optional[LogToQueue],
+            logger: logging.Logger,
             main_page_url: str=None, 
             retry_times: int=5, 
             sleep_seconds: int=30, 

@@ -1,9 +1,10 @@
 from collections import namedtuple
 from enum import Enum
 import json
+import logging
+import multiprocessing
 import os
 
-from utils.logger_util import LogToQueue, LoggerUtil
 from .database_utils import DatabaseUtil, JsonUtil, CsvUtil
 from typing import Optional, Union, List, Dict, Any, Tuple, Iterator, Callable
 from multiprocessing.pool import Pool
@@ -14,17 +15,17 @@ class Parser(Enum):
     HTML5LIB = 'html5lib'
 
 Info = namedtuple('Info', ['next_info', 'retry_info'])
+logger = logging.getLogger('crawler_util')
 
 class CrawlerUtil:
 
     database: Union[DatabaseUtil, JsonUtil, CsvUtil, None] = None
     
-    def __init__(self, database: Union[DatabaseUtil, JsonUtil, CsvUtil], logger_util: Optional[LoggerUtil]) -> None:
+    def __init__(self, database: Union[DatabaseUtil, JsonUtil, CsvUtil]) -> None:
         self.collected_data = []
         self.retry_info = []
         self.total_count = 0
         self.__class__.database = database
-        self.logger_util = logger_util
 
     def set_database(self, database: Union[DatabaseUtil, JsonUtil, CsvUtil]):
         self.__class__.database = database
@@ -36,7 +37,7 @@ class CrawlerUtil:
 
     def save(self):
         self.total_count += len(self.collected_data)
-        self.logger_util.logger.info("Saved %s into database", len(self.collected_data))
+        logger.info("Saved %s into database", len(self.collected_data))
         self.database.save(self.collected_data)
         self.collected_data = []
 
@@ -83,8 +84,8 @@ class CrawlerUtil:
         return all_next_info
 
 class CrawlerConfig:
-    def __init__(self, crawler_util: Optional[CrawlerUtil]=None, logger_util: Optional[LoggerUtil]=None, process_num: Optional[int]=None, chunk_size: Optional[int]=None) -> None:
+    def __init__(self, crawler_util: Optional[CrawlerUtil]=None, logger_queue: Optional[multiprocessing.Queue] = None, process_num: Optional[int]=None, chunk_size: Optional[int]=None) -> None:
         self.crawler_util = crawler_util
-        self.logger_util = logger_util
         self.process_num = process_num
         self.chunk_size = chunk_size
+        self.logger_queue = logger_queue
